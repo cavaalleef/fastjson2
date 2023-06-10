@@ -32,7 +32,7 @@ final class ObjectArrayReaderMultiType
 
     @Override
     public Object readObject(JSONReader jsonReader, Type fieldType, Object fieldName, long features) {
-        if (jsonReader.isJSONB()) {
+        if (jsonReader.jsonb) {
             return readJSONBObject(jsonReader, fieldType, fieldName, 0);
         }
 
@@ -104,7 +104,6 @@ final class ObjectArrayReaderMultiType
 
     @Override
     public Object createInstance(Collection collection) {
-        Object[] array = new Object[types.length];
-        return array;
+        return new Object[types.length];
     }
 }

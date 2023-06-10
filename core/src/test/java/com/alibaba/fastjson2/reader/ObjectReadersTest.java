@@ -1,13 +1,14 @@
 package com.alibaba.fastjson2.reader;
 
 import com.alibaba.fastjson2.JSONReader;
+import com.alibaba.fastjson2.function.Function;
 import com.alibaba.fastjson2.util.Fnv;
 import com.alibaba.fastjson2.util.TypeUtils;
 import org.junit.jupiter.api.Test;
 
+import java.awt.*;
 import java.util.List;
 import java.util.Map;
-import java.util.function.Function;
 
 import static com.alibaba.fastjson2.reader.ObjectReaders.*;
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -28,7 +29,7 @@ public class ObjectReadersTest {
     }
 
     static class ColorCreator
-            implements Function<Map<Long, Object>, java.awt.Color> {
+            implements Function<Map<Long, Object>, Color> {
         static final long HASH_RGB = Fnv.hashCode64("rgb");
         static final long HASH_R = Fnv.hashCode64("r");
         static final long HASH_G = Fnv.hashCode64("g");

@@ -1,12 +1,11 @@
 package com.alibaba.fastjson2;
 
 import com.alibaba.fastjson2.filter.*;
-import com.alibaba.fastjson2.modules.ObjectReaderModule;
-import com.alibaba.fastjson2.modules.ObjectWriterModule;
+import com.alibaba.fastjson2.function.Consumer;
+import com.alibaba.fastjson2.function.Function;
 import com.alibaba.fastjson2.reader.*;
-import com.alibaba.fastjson2.util.DateUtils;
-import com.alibaba.fastjson2.util.MultiType;
-import com.alibaba.fastjson2.util.TypeUtils;
+import com.alibaba.fastjson2.time.LocalDate;
+import com.alibaba.fastjson2.util.*;
 import com.alibaba.fastjson2.writer.FieldWriter;
 import com.alibaba.fastjson2.writer.ObjectWriter;
 import com.alibaba.fastjson2.writer.ObjectWriterAdapter;
@@ -20,17 +19,12 @@ import java.lang.reflect.Type;
 import java.net.URL;
 import java.nio.ByteBuffer;
 import java.nio.charset.Charset;
-import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.*;
-import java.util.function.Consumer;
-import java.util.function.Function;
 
 import static com.alibaba.fastjson2.JSONFactory.*;
 import static com.alibaba.fastjson2.JSONReader.EOI;
 import static com.alibaba.fastjson2.JSONReader.Feature.IgnoreCheckClose;
 import static com.alibaba.fastjson2.JSONReader.Feature.UseNativeObject;
-import static com.alibaba.fastjson2.util.JDKUtils.*;
 
 public interface JSON {
     /**
@@ -222,7 +216,8 @@ public interface JSON {
             return null;
         }
 
-        try (JSONReader reader = JSONReader.of(text)) {
+        final JSONReader.Context context = new JSONReader.Context(defaultObjectReaderProvider);
+        try (JSONReader reader = new JSONReaderUTF16(context, text, 0, text.length())) {
             if (reader.nextIfNull()) {
                 return null;
             }
@@ -414,7 +409,7 @@ public interface JSON {
             return null;
         }
 
-        try (JSONReader reader = JSONReader.of(input, StandardCharsets.UTF_8)) {
+        try (JSONReader reader = JSONReader.of(input, IOUtils.UTF_8)) {
             if (reader.isEnd()) {
                 return null;
             }
@@ -539,7 +534,7 @@ public interface JSON {
         }
 
         try (InputStream is = url.openStream()) {
-            return parseObject(is, StandardCharsets.UTF_8);
+            return parseObject(is, IOUtils.UTF_8);
         } catch (IOException e) {
             throw new JSONException("JSON#parseObject cannot parse '" + url + "'", e);
         }
@@ -698,9 +693,9 @@ public interface JSON {
             return null;
         }
 
-        try (JSONReader reader = JSONReader.of(text)) {
-            JSONReader.Context context = reader.context;
+        JSONReader.Context context = new JSONReader.Context(defaultObjectReaderProvider);
 
+        try (JSONReader reader = new JSONReaderUTF16(context, text, 0, text.length())) {
             boolean fieldBased = (context.features & JSONReader.Feature.FieldBased.mask) != 0;
             ObjectReader<T> objectReader = context.provider.getObjectReader(clazz, fieldBased);
 
@@ -839,6 +834,35 @@ public interface JSON {
      * {@code null} if received {@link String} is {@code null} or empty.
      *
      * @param text the specified string to be parsed
+     * @param type the specified actual type of {@link T}
+     * @return {@link T} or {@code null}
+     * @throws JSONException If a parsing error occurs
+     * @since 2.0.34
+     */
+    static <T extends Map<String, Object>> T parseObject(String text, MapMultiValueType<T> type) {
+        if (text == null || text.isEmpty()) {
+            return null;
+        }
+
+        try (JSONReader reader = JSONReader.of(text)) {
+            ObjectReader<T> objectReader = reader.context.provider.getObjectReader(type);
+
+            T object = objectReader.readObject(reader, type, null, 0);
+            if (reader.resolveTasks != null) {
+                reader.handleResolveTasks(object);
+            }
+            if (reader.ch != EOI && (reader.context.features & IgnoreCheckClose.mask) == 0) {
+                throw new JSONException(reader.info("input not end"));
+            }
+            return object;
+        }
+    }
+
+    /**
+     * Parses the json string as {@link T}. Returns
+     * {@code null} if received {@link String} is {@code null} or empty.
+     *
+     * @param text the specified string to be parsed
      * @param types the specified actual parameter types
      * @return {@link T} or {@code null}
      * @throws JSONException If a parsing error occurs
@@ -879,7 +903,7 @@ public interface JSON {
             if (reader.ch != EOI && (reader.context.features & IgnoreCheckClose.mask) == 0) {
                 throw new JSONException(reader.info("input not end"));
             }
-            return (T) object;
+            return object;
         }
     }
 
@@ -1702,7 +1726,7 @@ public interface JSON {
             return null;
         }
 
-        try (JSONReader reader = JSONReader.of(input, StandardCharsets.UTF_8)) {
+        try (JSONReader reader = JSONReader.of(input, IOUtils.UTF_8)) {
             if (reader.isEnd()) {
                 return null;
             }
@@ -1817,7 +1841,7 @@ public interface JSON {
             return null;
         }
 
-        try (JSONReader reader = JSONReader.of(input, StandardCharsets.UTF_8)) {
+        try (JSONReader reader = JSONReader.of(input, IOUtils.UTF_8)) {
             JSONReader.Context context = reader.context;
             if (format != null && !format.isEmpty()) {
                 context.setDateFormat(format);
@@ -1950,7 +1974,7 @@ public interface JSON {
      * @since 2.0.2
      */
     static <T> void parseObject(InputStream input, Type type, Consumer<T> consumer, JSONReader.Feature... features) {
-        parseObject(input, StandardCharsets.UTF_8, '\n', type, consumer, features);
+        parseObject(input, IOUtils.UTF_8, '\n', type, consumer, features);
     }
 
     /**
@@ -2298,7 +2322,7 @@ public interface JSON {
             return null;
         }
 
-        try (JSONReader reader = JSONReader.of(in, StandardCharsets.UTF_8)) {
+        try (JSONReader reader = JSONReader.of(in, IOUtils.UTF_8)) {
             if (reader.nextIfNull()) {
                 return null;
             }
@@ -2627,14 +2651,15 @@ public interface JSON {
      * @throws JSONException If a serialization error occurs
      */
     static String toJSONString(Object object) {
-        try (JSONWriter writer = JSONWriter.of()) {
+        JSONWriter.Context context = new JSONWriter.Context(JSONFactory.defaultObjectWriterProvider);
+        boolean optimizedForAscii = (defaultWriterFeatures & JSONWriter.Feature.OptimizedForAscii.mask) != 0;
+        try (JSONWriter writer = optimizedForAscii ? new JSONWriterUTF8(context) : new JSONWriterUTF16(context)) {
             if (object == null) {
                 writer.writeNull();
             } else {
                 writer.rootObject = object;
                 writer.path = JSONWriter.Path.ROOT;
 
-                JSONWriter.Context context = writer.context;
                 Class<?> valueClass = object.getClass();
                 if (valueClass == JSONObject.class && context.features == 0) {
                     writer.write((JSONObject) object);
@@ -3344,7 +3369,7 @@ public interface JSON {
             return ((JSONObject) object).to(clazz);
         }
 
-        return TypeUtils.cast(object, clazz, JSONFactory.getDefaultObjectReaderProvider());
+        return TypeUtils.cast(object, clazz, defaultObjectReaderProvider);
     }
 
     /**
@@ -3363,7 +3388,7 @@ public interface JSON {
      */
     static void mixIn(Class<?> target, Class<?> mixinSource) {
         JSONFactory.defaultObjectWriterProvider.mixIn(target, mixinSource);
-        JSONFactory.getDefaultObjectReaderProvider().mixIn(target, mixinSource);
+        JSONFactory.defaultObjectReaderProvider.mixIn(target, mixinSource);
     }
 
     /**
@@ -3374,7 +3399,7 @@ public interface JSON {
      * @since 2.0.2
      */
     static ObjectReader<?> register(Type type, ObjectReader<?> objectReader) {
-        return JSONFactory.getDefaultObjectReaderProvider().register(type, objectReader);
+        return JSONFactory.defaultObjectReaderProvider.register(type, objectReader);
     }
 
     /**
@@ -3385,18 +3410,7 @@ public interface JSON {
      * @since 2.0.6
      */
     static ObjectReader<?> registerIfAbsent(Type type, ObjectReader<?> objectReader) {
-        return JSONFactory.getDefaultObjectReaderProvider().registerIfAbsent(type, objectReader);
-    }
-
-    /**
-     * Register an {@link ObjectReaderModule} in default {@link com.alibaba.fastjson2.reader.ObjectReaderProvider}
-     *
-     * @see JSONFactory#getDefaultObjectReaderProvider()
-     * @see com.alibaba.fastjson2.reader.ObjectReaderProvider#register(ObjectReaderModule)
-     */
-    static boolean register(ObjectReaderModule objectReaderModule) {
-        ObjectReaderProvider provider = getDefaultObjectReaderProvider();
-        return provider.register(objectReaderModule);
+        return JSONFactory.defaultObjectReaderProvider.registerIfAbsent(type, objectReader);
     }
 
     static void registerSeeAlsoSubType(Class subTypeClass) {
@@ -3404,18 +3418,7 @@ public interface JSON {
     }
 
     static void registerSeeAlsoSubType(Class subTypeClass, String subTypeClassName) {
-        ObjectReaderProvider provider = getDefaultObjectReaderProvider();
-        provider.registerSeeAlsoSubType(subTypeClass, subTypeClassName);
-    }
-
-    /**
-     * Register an {@link ObjectWriterModule} in default {@link  com.alibaba.fastjson2.writer.ObjectWriterProvider}
-     *
-     * @see JSONFactory#getDefaultObjectWriterProvider()
-     * @see com.alibaba.fastjson2.writer.ObjectWriterProvider#register(ObjectWriterModule)
-     */
-    static boolean register(ObjectWriterModule objectWriterModule) {
-        return JSONFactory.getDefaultObjectWriterProvider().register(objectWriterModule);
+        defaultObjectReaderProvider.registerSeeAlsoSubType(subTypeClass, subTypeClassName);
     }
 
     /**
@@ -3426,7 +3429,7 @@ public interface JSON {
      * @since 2.0.2
      */
     static ObjectWriter<?> register(Type type, ObjectWriter<?> objectWriter) {
-        return JSONFactory.getDefaultObjectWriterProvider().register(type, objectWriter);
+        return JSONFactory.defaultObjectWriterProvider.register(type, objectWriter);
     }
 
     /**
@@ -3437,7 +3440,7 @@ public interface JSON {
      * @since 2.0.6
      */
     static ObjectWriter<?> registerIfAbsent(Type type, ObjectWriter<?> objectWriter) {
-        return JSONFactory.getDefaultObjectWriterProvider().registerIfAbsent(type, objectWriter);
+        return JSONFactory.defaultObjectWriterProvider.registerIfAbsent(type, objectWriter);
     }
 
     /**
@@ -3461,7 +3464,7 @@ public interface JSON {
         if (writerFilter) {
             ObjectWriter objectWriter
                     = JSONFactory
-                    .getDefaultObjectWriterProvider()
+                    .defaultObjectWriterProvider
                     .getObjectWriter(type);
             objectWriter.setFilter(filter);
         }

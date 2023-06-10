@@ -4,12 +4,12 @@ import com.alibaba.fastjson2.JSONB;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONFactory;
 import com.alibaba.fastjson2.JSONReader;
+import com.alibaba.fastjson2.function.Function;
 import com.alibaba.fastjson2.util.Fnv;
 
 import java.lang.reflect.Type;
 import java.util.Arrays;
 import java.util.Collection;
-import java.util.function.Function;
 
 final class ObjectReaderImplDoubleArray
         extends ObjectReaderPrimitive {
@@ -99,7 +99,7 @@ final class ObjectReaderImplDoubleArray
             } else if (item instanceof Number) {
                 value = ((Number) item).doubleValue();
             } else {
-                Function typeConvert = JSONFactory.getDefaultObjectReaderProvider().getTypeConvert(item.getClass(), Double.class);
+                Function typeConvert = JSONFactory.defaultObjectReaderProvider.getTypeConvert(item.getClass(), Double.class);
                 if (typeConvert == null) {
                     throw new JSONException("can not cast to Double " + item.getClass());
                 }

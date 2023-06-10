@@ -361,17 +361,6 @@ public class JSONWriterTest {
     }
 
     @Test
-    public void writeInstant() {
-        JSONWriter jsonWriter = JSONWriter.of(JSONWriter.Feature.PrettyFormat);
-        jsonWriter.writeInstant(null);
-        assertEquals("null", jsonWriter.toString());
-
-        StringWriter writer = new StringWriter();
-        jsonWriter.flushTo(writer);
-        assertEquals("null", writer.toString());
-    }
-
-    @Test
     public void writeSymbol() {
         JSONWriter jsonWriter = JSONWriter.ofUTF8();
         jsonWriter.writeSymbol("id");
@@ -1189,7 +1178,7 @@ public class JSONWriterTest {
     }
 
     static JSONObject parseObject(byte[] jsonbBytes) {
-        JSONReader.Context context = new JSONReader.Context(JSONFactory.getDefaultObjectReaderProvider());
+        JSONReader.Context context = new JSONReader.Context(JSONFactory.defaultObjectReaderProvider);
         JSONReader reader = new JSONReaderJSONB(
                 context,
                 jsonbBytes,
@@ -1204,7 +1193,7 @@ public class JSONWriterTest {
     }
 
     static JSONObject parseObjectUF(byte[] jsonbBytes) {
-        JSONReader.Context context = new JSONReader.Context(JSONFactory.getDefaultObjectReaderProvider());
+        JSONReader.Context context = new JSONReader.Context(JSONFactory.defaultObjectReaderProvider);
         JSONReader reader = new JSONReaderJSONBUF(
                 context,
                 jsonbBytes,
@@ -1219,7 +1208,7 @@ public class JSONWriterTest {
     }
 
     static <T> T parseObject(byte[] jsonbBytes, Class<T> objectClass, JSONReader.Feature... features) {
-        JSONReader.Context context = new JSONReader.Context(JSONFactory.getDefaultObjectReaderProvider());
+        JSONReader.Context context = new JSONReader.Context(JSONFactory.defaultObjectReaderProvider);
         context.config(features);
         JSONReader reader = new JSONReaderJSONB(
                 context,
@@ -1231,7 +1220,7 @@ public class JSONWriterTest {
     }
 
     static <T> T parseObjectUF(byte[] jsonbBytes, Class<T> objectClass, JSONReader.Feature... features) {
-        JSONReader.Context context = new JSONReader.Context(JSONFactory.getDefaultObjectReaderProvider());
+        JSONReader.Context context = new JSONReader.Context(JSONFactory.defaultObjectReaderProvider);
         context.config(features);
 
         JSONReader reader = new JSONReaderJSONBUF(

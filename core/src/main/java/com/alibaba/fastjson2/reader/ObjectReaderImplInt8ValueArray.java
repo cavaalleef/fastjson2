@@ -4,13 +4,13 @@ import com.alibaba.fastjson2.JSONB;
 import com.alibaba.fastjson2.JSONException;
 import com.alibaba.fastjson2.JSONFactory;
 import com.alibaba.fastjson2.JSONReader;
+import com.alibaba.fastjson2.function.Function;
 import com.alibaba.fastjson2.util.Fnv;
+import com.alibaba.fastjson2.util.IOUtils;
 
 import java.lang.reflect.Type;
 import java.util.Arrays;
-import java.util.Base64;
 import java.util.Collection;
-import java.util.function.Function;
 
 import static com.alibaba.fastjson2.JSONReader.Feature.Base64StringAsByteArray;
 
@@ -81,7 +81,7 @@ class ObjectReaderImplInt8ValueArray
             byte[] bytes;
             if ((jsonReader.features(this.features | features) & Base64StringAsByteArray.mask) != 0) {
                 String str = jsonReader.readString();
-                bytes = Base64.getDecoder().decode(str);
+                bytes = IOUtils.decodeBase64(str);
             } else {
                 bytes = jsonReader.readBinary();
             }
@@ -109,7 +109,7 @@ class ObjectReaderImplInt8ValueArray
             bytes = jsonReader.readBinary();
         } else if (jsonReader.isString()) {
             String str = jsonReader.readString();
-            bytes = Base64.getDecoder().decode(str);
+            bytes = IOUtils.decodeBase64(str);
         } else {
             int entryCnt = jsonReader.startArray();
             if (entryCnt == -1) {
@@ -137,7 +137,7 @@ class ObjectReaderImplInt8ValueArray
             } else if (item instanceof Number) {
                 value = ((Number) item).byteValue();
             } else {
-                Function typeConvert = JSONFactory.getDefaultObjectReaderProvider().getTypeConvert(item.getClass(), byte.class);
+                Function typeConvert = JSONFactory.defaultObjectReaderProvider.getTypeConvert(item.getClass(), byte.class);
                 if (typeConvert == null) {
                     throw new JSONException("can not cast to byte " + item.getClass());
                 }

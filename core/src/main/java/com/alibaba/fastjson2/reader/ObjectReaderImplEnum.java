@@ -73,8 +73,11 @@ public final class ObjectReaderImplEnum
         }
 
         Type createMethodParamType = null;
-        if (createMethod != null && createMethod.getParameterCount() == 1) {
-            createMethodParamType = createMethod.getParameterTypes()[0];
+        if (createMethod != null) {
+            Class<?>[] parameterTypes = createMethod.getParameterTypes();
+            if (parameterTypes.length == 1) {
+                createMethodParamType = parameterTypes[0];
+            }
         }
         this.createMethodParamType = createMethodParamType;
 

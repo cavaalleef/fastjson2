@@ -17,7 +17,7 @@ final class ObjectReaderImplMapString
 
     @Override
     public Object readObject(JSONReader jsonReader, Type fieldType, Object fieldName, long features) {
-        if (jsonReader.isJSONB()) {
+        if (jsonReader.jsonb) {
             return this.readJSONBObject(jsonReader, fieldType, fieldName, features);
         }
 
@@ -40,7 +40,7 @@ final class ObjectReaderImplMapString
             }
         }
 
-        JSONReader.Context context = jsonReader.getContext();
+        JSONReader.Context context = jsonReader.context;
         Map<String, Object> object
                 = instanceType == HashMap.class
                 ? new HashMap<>()

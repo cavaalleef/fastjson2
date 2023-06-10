@@ -1,6 +1,8 @@
 package com.alibaba.fastjson2.reader;
 
 import com.alibaba.fastjson2.*;
+import com.alibaba.fastjson2.function.Function;
+import com.alibaba.fastjson2.function.Supplier;
 import com.alibaba.fastjson2.util.*;
 
 import java.lang.reflect.*;
@@ -9,22 +11,15 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ConcurrentMap;
 import java.util.concurrent.ConcurrentNavigableMap;
 import java.util.concurrent.ConcurrentSkipListMap;
-import java.util.function.Function;
-import java.util.function.Supplier;
 
 import static com.alibaba.fastjson2.JSONB.Constants.*;
-import static com.alibaba.fastjson2.util.JDKUtils.UNSAFE_SUPPORT;
+import static com.alibaba.fastjson2.util.TypeUtils.CLASS_JSON_OBJECT_1x;
 
 public final class ObjectReaderImplMap
         implements ObjectReader {
-    static Function UNSAFE_OBJECT_CREATOR;
     static final Class CLASS_SINGLETON_MAP = Collections.singletonMap(1, 1).getClass();
     static final Class CLASS_EMPTY_MAP = Collections.EMPTY_MAP.getClass();
-    static final Class CLASS_EMPTY_SORTED_MAP = Collections.emptySortedMap().getClass();
-    static final Class CLASS_EMPTY_NAVIGABLE_MAP = Collections.emptyNavigableMap().getClass();
     static final Class CLASS_UNMODIFIABLE_MAP = Collections.unmodifiableMap(Collections.emptyMap()).getClass();
-    static final Class CLASS_UNMODIFIABLE_SORTED_MAP = Collections.unmodifiableSortedMap(Collections.emptySortedMap()).getClass();
-    static final Class CLASS_UNMODIFIABLE_NAVIGABLE_MAP = Collections.unmodifiableNavigableMap(Collections.emptyNavigableMap()).getClass();
 
     public static ObjectReaderImplMap INSTANCE = new ObjectReaderImplMap(null, HashMap.class, HashMap.class, 0, null);
     public static ObjectReaderImplMap INSTANCE_OBJECT = new ObjectReaderImplMap(null, JSONObject.class, JSONObject.class, 0, null);
@@ -55,33 +50,15 @@ public final class ObjectReaderImplMap
             instanceType = HashMap.class;
         } else if (mapType == CLASS_UNMODIFIABLE_MAP) {
             instanceType = LinkedHashMap.class;
-        } else if (mapType == SortedMap.class
-                || mapType == CLASS_UNMODIFIABLE_SORTED_MAP
-                || mapType == CLASS_UNMODIFIABLE_NAVIGABLE_MAP
-        ) {
-            instanceType = TreeMap.class;
         } else if (mapType == ConcurrentMap.class) {
             instanceType = ConcurrentHashMap.class;
         } else if (mapType == ConcurrentNavigableMap.class) {
             instanceType = ConcurrentSkipListMap.class;
         } else {
-            switch (mapType.getTypeName()) {
-                case "com.google.common.collect.ImmutableMap":
-                case "com.google.common.collect.RegularImmutableMap":
-                    instanceType = HashMap.class;
-                    builder = GuavaSupport.immutableMapConverter();
-                    break;
-                case "com.google.common.collect.SingletonImmutableBiMap":
-                    instanceType = HashMap.class;
-                    builder = GuavaSupport.singletonBiMapConverter();
-                    break;
+            switch (TypeUtils.getTypeName(mapType)) {
                 case "java.util.Collections$SynchronizedMap":
                     instanceType = HashMap.class;
                     builder = (Function<Map, Map>) Collections::synchronizedMap;
-                    break;
-                case "java.util.Collections$SynchronizedNavigableMap":
-                    instanceType = TreeMap.class;
-                    builder = (Function<NavigableMap, NavigableMap>) Collections::synchronizedNavigableMap;
                     break;
                 case "java.util.Collections$SynchronizedSortedMap":
                     instanceType = TreeMap.class;
@@ -119,41 +96,22 @@ public final class ObjectReaderImplMap
         }
 
         String instanceTypeName = instanceType.getName();
-        switch (instanceTypeName) {
-            case "com.alibaba.fastjson.JSONObject":
-                builder = createObjectSupplier(instanceType);
-                instanceType = HashMap.class;
-                break;
-            case "com.google.common.collect.RegularImmutableMap":
-                builder = GuavaSupport.immutableMapConverter();
-                instanceType = HashMap.class;
-                break;
-            case "com.google.common.collect.SingletonImmutableBiMap":
-                builder = GuavaSupport.singletonBiMapConverter();
-                instanceType = HashMap.class;
-                break;
-            case "com.google.common.collect.ArrayListMultimap":
-                builder = GuavaSupport.createConvertFunction(instanceType);
-                instanceType = HashMap.class;
-                break;
-            default:
-                if (instanceType == JSONObject1O.class) {
-                    Class objectClass = TypeUtils.loadClass("com.alibaba.fastjson.JSONObject");
-                    builder = createObjectSupplier(objectClass);
-                    instanceType = LinkedHashMap.class;
-                } else if (mapType == CLASS_UNMODIFIABLE_MAP) {
-                    builder = (Function<Map, Map>) Collections::unmodifiableMap;
-                } else if (mapType == CLASS_UNMODIFIABLE_SORTED_MAP) {
-                    builder = (Function<SortedMap, SortedMap>) Collections::unmodifiableSortedMap;
-                } else if (mapType == CLASS_UNMODIFIABLE_NAVIGABLE_MAP) {
-                    builder = (Function<NavigableMap, NavigableMap>) Collections::unmodifiableNavigableMap;
-                } else if (mapType == CLASS_SINGLETON_MAP) {
-                    builder = (Function<Map, Map>) (Map map) -> {
-                        Map.Entry entry = (Map.Entry) map.entrySet().iterator().next();
-                        return Collections.singletonMap(entry.getKey(), entry.getValue());
-                    };
-                }
-                break;
+        if (instanceTypeName.equals("com.alibaba.fastjson.JSONObject")) {
+            builder = createObjectSupplier(instanceType);
+            instanceType = HashMap.class;
+        } else {
+            if (instanceType == JSONObject1O.class) {
+                Class objectClass = CLASS_JSON_OBJECT_1x;
+                builder = createObjectSupplier(objectClass);
+                instanceType = LinkedHashMap.class;
+            } else if (mapType == CLASS_UNMODIFIABLE_MAP) {
+                builder = (Function<Map, Map>) Collections::unmodifiableMap;
+            } else if (mapType == CLASS_SINGLETON_MAP) {
+                builder = (Function<Map, Map>) (Map map) -> {
+                    Map.Entry entry = (Map.Entry) map.entrySet().iterator().next();
+                    return Collections.singletonMap(entry.getKey(), entry.getValue());
+                };
+            }
         }
 
         return new ObjectReaderImplMap(fieldType, mapType, instanceType, features, builder);
@@ -196,32 +154,22 @@ public final class ObjectReaderImplMap
             return Collections.emptyMap();
         }
 
-        if (instanceType == CLASS_EMPTY_SORTED_MAP) {
-            return Collections.emptySortedMap();
-        }
-
-        if (instanceType == CLASS_EMPTY_NAVIGABLE_MAP) {
-            return Collections.emptyNavigableMap();
-        }
-
-        if (UNSAFE_SUPPORT) {
-            String instanceTypeName = instanceType.getName();
-            switch (instanceTypeName) {
-                case "com.ali.com.google.common.collect.EmptyImmutableBiMap":
-                    return ((Supplier) () -> {
-                        try {
-                            return UnsafeUtils.UNSAFE.allocateInstance(instanceType);
-                        } catch (InstantiationException e) {
-                            throw new JSONException("create map error : " + instanceType);
-                        }
-                    }).get();
-                case "java.util.ImmutableCollections$Map1":
-                    return new HashMap<>();
-                case "java.util.ImmutableCollections$MapN":
-                    return new LinkedHashMap<>();
-                default:
-                    break;
-            }
+        String instanceTypeName = instanceType.getName();
+        switch (instanceTypeName) {
+            case "com.ali.com.google.common.collect.EmptyImmutableBiMap":
+                return ((Supplier) () -> {
+                    try {
+                        return JDKUtils.UNSAFE.allocateInstance(instanceType);
+                    } catch (InstantiationException e) {
+                        throw new JSONException("create map error : " + instanceType);
+                    }
+                }).get();
+            case "java.util.ImmutableCollections$Map1":
+                return new HashMap<>();
+            case "java.util.ImmutableCollections$MapN":
+                return new LinkedHashMap<>();
+            default:
+                break;
         }
 
         try {
@@ -252,11 +200,6 @@ public final class ObjectReaderImplMap
     }
 
     @Override
-    public FieldReader getFieldReader(long hashCode) {
-        return null;
-    }
-
-    @Override
     public Object readJSONBObject(JSONReader jsonReader, Type fieldType, Object fieldName1, long features) {
         ObjectReader objectReader = jsonReader.checkAutoType(mapType, mapTypeHash, this.features | features);
         if (objectReader != null && objectReader != this) {
@@ -270,7 +213,7 @@ public final class ObjectReaderImplMap
         boolean emptyObject = false;
         jsonReader.nextIfMatch(BC_OBJECT);
 
-        Supplier<Map> objectSupplier = jsonReader.getContext().getObjectSupplier();
+        Supplier<Map> objectSupplier = jsonReader.context.getObjectSupplier();
         Map map = null;
         if (mapType == null && objectSupplier != null) {
             map = objectSupplier.get();
@@ -321,7 +264,7 @@ public final class ObjectReaderImplMap
                 }
 
                 Object fieldName;
-                if (type >= BC_STR_ASCII_FIX_MIN && type <= BC_SYMBOL) {
+                if (type >= BC_STR_ASCII_FIX_MIN) {
                     fieldName = jsonReader.readFieldName();
                 } else if (jsonReader.nextIfMatch(BC_REFERENCE)) {
                     String reference = jsonReader.readString();
@@ -336,7 +279,7 @@ public final class ObjectReaderImplMap
                     if ("..".equals(reference)) {
                         map.put(fieldName, map);
                     } else {
-                        jsonReader.addResolveTask((Map) map, fieldName, JSONPath.of(reference));
+                        jsonReader.addResolveTask(map, fieldName, JSONPath.of(reference));
                         map.put(fieldName, null);
                     }
                     continue;
@@ -382,12 +325,12 @@ public final class ObjectReaderImplMap
 
     @Override
     public Object readObject(JSONReader jsonReader, Type fieldType, Object fieldName, long features) {
-        if (jsonReader.isJSONB()) {
+        if (jsonReader.jsonb) {
             return readJSONBObject(jsonReader, fieldType, fieldName, features);
         }
 
-        JSONReader.Context context = jsonReader.getContext();
-        Supplier<Map> objectSupplier = jsonReader.getContext().getObjectSupplier();
+        JSONReader.Context context = jsonReader.context;
+        Supplier<Map> objectSupplier = jsonReader.context.getObjectSupplier();
         Map object;
         if (objectSupplier != null && (mapType == null || mapType == JSONObject.class || "com.alibaba.fastjson.JSONObject".equals(mapType.getName()))) {
             object = objectSupplier.get();
@@ -407,13 +350,6 @@ public final class ObjectReaderImplMap
     }
 
     static Function createObjectSupplier(Class objectClass) {
-        if (UNSAFE_SUPPORT) {
-            if (UNSAFE_OBJECT_CREATOR != null) {
-                return UNSAFE_OBJECT_CREATOR;
-            }
-            return UNSAFE_OBJECT_CREATOR = new ObjectCreatorUF(objectClass);
-        }
-
         Constructor constructor;
         try {
             constructor = objectClass.getConstructor(Map.class);
@@ -428,38 +364,5 @@ public final class ObjectReaderImplMap
                 throw new JSONException("create JSONObject1 error");
             }
         };
-    }
-
-    static class ObjectCreatorUF
-            implements Function {
-        final Class objectClass;
-        final Field map;
-        final long mapOffset;
-
-        ObjectCreatorUF(Class objectClass) {
-            this.objectClass = objectClass;
-            try {
-                map = objectClass.getDeclaredField("map");
-            } catch (NoSuchFieldException e) {
-                throw new JSONException("field map not found", e);
-            }
-            mapOffset = UnsafeUtils.UNSAFE.objectFieldOffset(map);
-        }
-
-        @Override
-        public Object apply(Object map) {
-            if (map == null) {
-                map = new HashMap<>();
-            }
-
-            Object object;
-            try {
-                object = UnsafeUtils.UNSAFE.allocateInstance(objectClass);
-                UnsafeUtils.UNSAFE.putObject(object, mapOffset, (Map) map);
-            } catch (InstantiationException e) {
-                throw new JSONException("create " + objectClass.getName() + " error", e);
-            }
-            return object;
-        }
     }
 }

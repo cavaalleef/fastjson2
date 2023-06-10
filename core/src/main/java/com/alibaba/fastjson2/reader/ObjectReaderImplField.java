@@ -29,7 +29,7 @@ public class ObjectReaderImplField
         String declaringClassName = jsonReader.readString();
         String methodName = jsonReader.readString();
 
-        return getField(jsonReader.getContext().getFeatures() | features, methodName, declaringClassName);
+        return getField(jsonReader.context.getFeatures() | features, methodName, declaringClassName);
     }
 
     @Override
@@ -49,7 +49,7 @@ public class ObjectReaderImplField
 
         jsonReader.nextIfMatch(',');
 
-        return getField(jsonReader.getContext().getFeatures() | features, methodName, declaringClassName);
+        return getField(jsonReader.context.getFeatures() | features, methodName, declaringClassName);
     }
 
     @Override
@@ -57,7 +57,7 @@ public class ObjectReaderImplField
         boolean objectStart = jsonReader.nextIfObjectStart();
         if (!objectStart) {
             if (jsonReader.isSupportBeanArray(features)) {
-                if (jsonReader.isJSONB()) {
+                if (jsonReader.jsonb) {
                     return readArrayMappingJSONBObject(jsonReader, fieldType, fieldName, features);
                 } else {
                     return readArrayMappingObject(jsonReader, fieldType, fieldName, features);
@@ -84,11 +84,11 @@ public class ObjectReaderImplField
             }
         }
 
-        if (!jsonReader.isJSONB()) {
+        if (!jsonReader.jsonb) {
             jsonReader.nextIfMatch(',');
         }
 
-        return getField(jsonReader.getContext().getFeatures() | features, methodName, declaringClassName);
+        return getField(jsonReader.context.getFeatures() | features, methodName, declaringClassName);
     }
 
     private Field getField(long features,

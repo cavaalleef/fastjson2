@@ -2,6 +2,8 @@ package com.alibaba.fastjson2;
 
 import com.alibaba.fastjson2.annotation.JSONField;
 import com.alibaba.fastjson2.reader.ObjectReaderProvider;
+import com.alibaba.fastjson2.time.LocalTime;
+import com.alibaba.fastjson2.time.ZoneId;
 import com.alibaba.fastjson2.util.Fnv;
 import org.junit.jupiter.api.Test;
 
@@ -9,8 +11,6 @@ import java.io.StringReader;
 import java.lang.reflect.Type;
 import java.math.BigDecimal;
 import java.nio.charset.StandardCharsets;
-import java.time.LocalTime;
-import java.time.ZoneId;
 import java.util.*;
 
 import static org.junit.jupiter.api.Assertions.*;
@@ -503,7 +503,7 @@ public class JSONReaderTest {
         context.setLocale(china);
         assertSame(china, context.getLocale());
 
-        ZoneId zoneId = ZoneId.systemDefault();
+        ZoneId zoneId = ZoneId.DEFAULT_ZONE_ID;
         context.setZoneId(zoneId);
         assertSame(zoneId, context.getZoneId());
 
@@ -993,9 +993,9 @@ public class JSONReaderTest {
         String str = "\"12:34\"";
         JSONReader jsonReader = JSONReader.of(str.getBytes());
         LocalTime localTime = jsonReader.readLocalTime();
-        assertEquals(12, localTime.getHour());
-        assertEquals(34, localTime.getMinute());
-        assertEquals(0, localTime.getSecond());
+        assertEquals(12, localTime.hour);
+        assertEquals(34, localTime.minute);
+        assertEquals(0, localTime.second);
     }
 
     @Test
@@ -1049,7 +1049,7 @@ public class JSONReaderTest {
 
     @Test
     public void context() {
-        ObjectReaderProvider provider = JSONFactory.getDefaultObjectReaderProvider();
+        ObjectReaderProvider provider = JSONFactory.defaultObjectReaderProvider;
         SymbolTable symbolTable = JSONB.symbolTable("id", "name");
         JSONReader.Context context = new JSONReader.Context(provider, symbolTable, JSONReader.Feature.SupportAutoType);
         assertSame(symbolTable, context.symbolTable);

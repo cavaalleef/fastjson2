@@ -11,7 +11,7 @@ public class JSONPath_enum {
         Model model = new Model();
         model.size = Size.Small;
 
-        assertEquals(Size.Small.name(), JSONPath.eval(model, "$.size.name"));
+        assertEquals(Size.Small.name(), JSONPath.of("$.size.name").eval(model));
     }
 
     @Test
@@ -19,7 +19,7 @@ public class JSONPath_enum {
         Model model = new Model();
         model.size = Size.Small;
 
-        assertEquals(Size.Small.ordinal(), JSONPath.eval(model, "$.size.ordinal"));
+        assertEquals(Size.Small.ordinal(), JSONPath.of("$.size.ordinal").eval(model));
     }
 
     public static class Model {
